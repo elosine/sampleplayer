@@ -1,134 +1,102 @@
+//Building a Sample Player, the sausage factory version
+//GUI PART II - WAVEFORM DISPLAY
+//You'll recognize the code below from our last session
+//If we run it and have our supercollider code running we should see an animated cursor
+//Now we need to create a visual waveform display
+//We'll do 3 things:
+////Send a message to supercollider requesting the waveform data
+////Create an OSC receiver to recive the waveform data
+////Visualize the waveform data in our sample window
+
+//The workflow goes like this:
+////Our processing sketch, let's call it proc, sends a  message like this: "/getwf", 0, 1000
+////Supercollider, sc for short, receives this message and the OSCdef: \getwf responds to it by
+////running the function ~wff with the arguments sent along '0, 1000': ~wff.value(0, 1000)
+////Our ~wff function grabs the designated buffer, converts it to a float array, and resamples it to 1000 samples (as designated in the argument
+////It then sends this array back to proc with the "/wavfrm" OSC address, something like this: "/wavfrm", 0.0004, 0.00041, 0.00042... + 997 more
 
 
-//Welcome to Processing and the first part of our Sample Player GUI
-//Step-by-step is not as easy to display in processing so I'll create a step, and then copy it and comment out previous steps
+//PART 1 - SEND A MESSAGE TO SUPERCOLLIDER REQUESTING THE WAVEFORM DATA
+//let's first have a look at our supercollider code, the oscdef
+/*
 
-//First let's set up our basic sketch and OSC communication
+ //OSCdef for requesting waveform data
+ OSCdef(\getwf, { |msg|
+ var bufnum = msg[1].asInteger;
+ var numpx = msg[2].asInteger;
+ ~wff.value(bufnum, numpx);
+ }, "/getwf");
+ */
 
-//Import the OSC libraries
+//We are expecting a message with the OSC address "/getwf"
+//It needs a few arguments:
+////the buffer number, which is a place holder for now but will be useful when we expand to multiple buffers
+////and the number pixels width in our sample display area
+
+//We also need to decide when/how we send the message
+//For now, let's use mousepressed as a triger, any time our mouse is pressed on our sketch we'll request waveform data
+//We add a mousePressed() function to our code
 
 /*
-import netP5.*;
-import oscP5.*;
-
-//Declare the main OSC machine and a NetAddress for sending to supercollider
-
-OscP5 osc;
-NetAddress sc;
-
-void setup(){
-  size(1000, 250);
-  //Initialize the Osc machine and sc netaddress in setup
-  osc = new OscP5(this, 12321);
-  //OscP5 instance/constructor takes the context as first argument in this case 'this' or the root sketch
-  //and our home port number which is an arbritary '12321' and consistant with the number I use in the ~proc netaddress in supercollider
-  sc = new NetAddress("127.0.0.1", 57120);
-  //NetAddress takes the arguments of destination ip address, 
-  //in this case the default local host, and 57120 which is the default port number for the supercollider language side
-}
-
-void draw(){
-  background(0);
-  
-}
-*/
-
-/*
-//STEP 2
-
-//Now let's request the index data from supercollider in draw
-
-import netP5.*;
-import oscP5.*;
-
-OscP5 osc;
-NetAddress sc;
-
-void setup(){
-  size(1000, 250);
-  osc = new OscP5(this, 12321);
-  sc = new NetAddress("127.0.0.1", 57120);
-}
-
-void draw(){
-  background(0);
-  //send an osc message in draw with the osc address "/getix" which will communicate with the OSCdef we made in supercollider
-  OscMessage msg1 = new OscMessage("/getix"); //create a new OscMessage
-  osc.send(msg1, sc); //send it to supercolllider, it will send once each draw frame
-}
-
-*/
-
-/*
-//STEP 3
-
-//When the OSCdef \getix we set up in supercollider receives the "/getix" message from Processing
-//it will immediately send back the index data from the bus to our Processing sketch with the address "/ix"
-//We then need to create a receiver in this sketch, equivalent to a Processing version of OSCdef
-//However OSC communication works differently in JAVA/Processing, or at least the syntax/structure is slightly different
-//I will jump past a more standard way of receiving and responding to OSC messages and directly use the handy
-//forwarding service OSC.plug
-//You can learn more if you go to the oscP5 example, "oscP5plug"
-
-//oscP5plug basically works a lot like OSCdef in Supercollider
-//it listens for a particular OSC address and then forwards the message and its data to a specified function in your sketch
-//so lets create the receiving function below at the bottom of the code
-
-//next we'll set up the oscplug in setup
-
-//Now if you have the code still running in supercollider and  run this sketch you should
-//see the phasor value printed below in the Processing console
-
-//Great job!
-
 import netP5.*;
 import oscP5.*;
 
 OscP5 osc;
 NetAddress sc;
 
-void setup(){
-  size(1000, 250);
+//variable for cursor animation
+float cx = 50.0;
+
+//sample display variables
+float sw = 1000.0; //sample width
+
+void setup() {
+  size(1100, 250);
   osc = new OscP5(this, 12321);
   sc = new NetAddress("127.0.0.1", 57120);
-  //make the oscplugs to forward osc messages to appropriate functions
-  //index location
   osc.plug(this, "ix", "/ix");
-  //the first argument is the context, 2nd is the name of the function you are forwarding to, and 3rd the OSC address to listen for
 }
 
-void draw(){
-  background(0);
-  //send an osc message in draw with the osc address "/getix" which will communicate with the OSCdef we made in supercollider
-  OscMessage msg1 = new OscMessage("/getix"); //create a new OscMessage
-  osc.send(msg1, sc); //send it to supercolllider, it will send once each draw frame
+void draw() {
+  background(100);
+  OscMessage msg1 = new OscMessage("/getix"); 
+  osc.send(msg1, sc); 
+
+  //Sample Display Background
+  noStroke();
+  fill(0);
+  rect(50, 50, sw, 150);
+
+  //Cursor
+  strokeWeight(3);
+  stroke(153, 255, 0);
+  //cursor with x variable
+  line(cx, 50, cx, 200);
 }
 
-//This is the function to receive index information from supercollider
-//It is passed the single float argument 'val' which needs to be consistant with the message from supercollider
-//It will look something like this - "/ix", 0.342344
-void ix(float val){
-  //Let's just print out the value for now
-  println(val);
-  
+void ix(float val) {
+  float ixtmp = map(val, 0.0, 1.0, 50.0, 1050.0);
+  cx = ixtmp;
+}
+
+void mousePressed(){
+  //When we press the mouse on our sketch
+  //We send a request for waveform data from supercollider
+  OscMessage msg2 = new OscMessage("/getwf"); //the OSCaddress our OSCdef in sc expects
+  msg2.add(0); //the buffer number (useful later)
+  //Let's make the width of our sample window a variable and add it here as an argument
+  msg2.add(sw);
+  //send it to supercollider
+  osc.send(msg2, sc);
 }
 */
 
-
-//STEP 4
-//Now, let's create a basic area for displaying our sample and a scrolling cursor
-//we'll draw a simple rectangle for the sample background
-//we'll animate a vertical line for the cursor
-//we'll have to map the data from the 0.0 - 1.0 number to the length of the sample display for the cursor
-
-//First, make the sample background, see in draw
-
-//Next make a line for the cursor, see in draw below the background
-
-//Next create a variable for the x portions of the cursor line
-
-//Next modify the ix function that receives the index location from Supercollider
-//to first map then change the cx variable to animate the cursor
+//PART 2 - CREATE AN OSC RECEIVER TO RECEIVE THE WAVEFORM DATA
+////Once we have sent sc a request for waveform data, it sends it right back to us
+////Let's create a receiver function to collect the data
+////We'll first have to modify our OSC set-up so it can handle larger chunks of data
+////Then we'll create a receiving function
+////Finally we'll create an oscplug to forward the waveform data to the function
 
 import netP5.*;
 import oscP5.*;
@@ -139,44 +107,45 @@ NetAddress sc;
 //variable for cursor animation
 float cx = 50.0;
 
-void setup(){
+//sample display variables
+float sw = 1000.0; //sample width
+
+void setup() {
   size(1100, 250);
   osc = new OscP5(this, 12321);
   sc = new NetAddress("127.0.0.1", 57120);
   osc.plug(this, "ix", "/ix");
 }
 
-void draw(){
+void draw() {
   background(100);
   OscMessage msg1 = new OscMessage("/getix"); 
   osc.send(msg1, sc); 
-  
+
   //Sample Display Background
   noStroke();
   fill(0);
-  rect(50, 50, 1000, 150);
-  
+  rect(50, 50, sw, 150);
+
   //Cursor
   strokeWeight(3);
-  stroke(153,255,0);
-  //basic cursor
-  //line(50, 50, 50, 200);
+  stroke(153, 255, 0);
   //cursor with x variable
   line(cx, 50, cx, 200);
 }
 
-void ix(float val){
-//  println(val);
-//Create a local float to map the incomming normalized index value
-float ixtmp = map(val, 0.0, 1.0, 50.0, 1050.0);
-//map takes the input to map, the input's low, the input's high, the lo of the range you wish to map to, the hi of the range you are mapping to
-//in this case the beginning of the sample display, 50 and the end of the sample display 1050, or y(50) + width(1000)
-
-//update cx to ixtmp
-cx = ixtmp;
-
-//et voila! your animated cursor synced to your buffer player
-  
+void ix(float val) {
+  float ixtmp = map(val, 0.0, 1.0, 50.0, 1050.0);
+  cx = ixtmp;
 }
 
-//We'll actually wrap up this segment here and tackle waveform display next time.
+void mousePressed(){
+  //When we press the mouse on our sketch
+  //We send a request for waveform data from supercollider
+  OscMessage msg2 = new OscMessage("/getwf"); //the OSCaddress our OSCdef in sc expects
+  msg2.add(0); //the buffer number (useful later)
+  //Let's make the width of our sample window a variable and add it here as an argument
+  msg2.add(sw);
+  //send it to supercollider
+  osc.send(msg2, sc);
+}
